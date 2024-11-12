@@ -43,11 +43,33 @@ type b2ConfigMapper struct {
 	config map[string]string
 }
 
+func newB2ConfigMapper(secret *b2Secret) *b2ConfigMapper {
+	return &b2ConfigMapper{
+		config: map[string]string{
+			// These values are the hard-coded defaults in the Rclone B2 backend
+			// but are mandatory to make the backend work
+			"chunk_size":             (96 * fs.Mebi).String(),
+			"upload_cutoff":          (200 * fs.Mebi).String(),
+			"upload_concurrency":     "4",
+			"copy_cutoff":            (4 * fs.Gibi).String(),
+			"download_auth_duration": (fs.Duration(7 * 24 * time.Hour)).String(),
+
+			// B2 secrets
+			"account": secret.AccountID,
+			"key":     secret.Key,
+
+			// Actually delete the files, don't just hide them
+			"hard_delete": "true",
+		},
+	}
+}
+
 func (b *b2ConfigMapper) Get(key string) (value string, ok bool) {
 	value, ok = b.config[key]
 	return
 }
 
+// Set is no-op since it's not used and just here to satisfy the interface
 func (b *b2ConfigMapper) Set(key, value string) {}
 
 func getB2Config(ctx context.Context, secretPath string) (*b2ConfigMapper, error) {
@@ -65,20 +87,7 @@ func getB2Config(ctx context.Context, secretPath string) (*b2ConfigMapper, error
 		return nil, err
 	}
 
-	// These values are the hard-coded defaults in the Rclone B2 backend
-	var config = map[string]string{
-		"chunk_size":             (96 * fs.Mebi).String(),
-		"upload_cutoff":          (200 * fs.Mebi).String(),
-		"upload_concurrency":     "4",
-		"copy_cutoff":            (4 * fs.Gibi).String(),
-		"download_auth_duration": (fs.Duration(7 * 24 * time.Hour)).String(),
-	}
-
-	config["account"] = b2Creds.AccountID
-	config["key"] = b2Creds.Key
-	config["hard_delete"] = "true"
-
-	return &b2ConfigMapper{config: config}, nil
+	return newB2ConfigMapper(&b2Creds), nil
 }
 
 func main() {
