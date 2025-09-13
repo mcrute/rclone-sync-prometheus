@@ -39,10 +39,30 @@ command line flags.
 
 ## Running
 
-This is designed to be run as a cron job. The code expects to be able
-to fetch credentials from a Hashicorp Vault instance which must be
-configured in the environment. The following environment variables are
-mandatory and the application will fail to run without them:
+The application supports a pre-environment file which is a JSON file
+that contains key/value pairs that will be read and injected into the
+process environment immediately after flag parsing but before any other
+program logic. While the file can contain any environment variables
+this is mostly designed for injecting Vault secrets. The default file
+location is `/etc/default/restic-backup.json` but can be overridden
+using the `--env-file` command line flag. If the specified file does not
+exist it is silently ignored, any other errors reading or parsing the
+file are fatal.
+
+For example, this file configures the Vault JWT:
+
+```json
+{
+    "VAULT_JWT": "a-jwt-token"
+}
+```
+
+This program is designed to be run as a cron job. The code expects to be
+able to fetch credentials from a Hashicorp Vault instance which must be
+configured in the environment. One set of these variables is mandatory
+and the application will fail to run without them:
+
+This set configured AppRole authentication:
 
 * `VAULT_ADDR` the HTTP/S address the Vault server.
 * `VAULT_TOKEN` (optional) a Vault token to use for authentication
@@ -50,9 +70,24 @@ mandatory and the application will fail to run without them:
   to Vault using the AppRole backend. Either these or `VAULT_TOKEN` must
   be specified otherwise Vault will fail to initialize.
 
+This set configures JWT authentication:
+
+* `VAULT_JWT` the JWT used to authenticate to Vault
+
 On success the application will print noting and exit with a `0` status
 code. Use prometheus to scrape the metrics from your pushgateway
 instance and set alerts.
+
+By default a DNS SRV query for `_vault._tcp.<search_domain>` will
+be executed to locate the Vault host. Normally `<search_domain>`
+is the `search` line from your `/etc/resolv.conf` file, however
+this can be overridden at runtime by setting `SEARCH_DOMAIN` in the
+environment. This autodiscovery behavior can be disabled entirely with
+the `--no-discover-vault` command line flag.
+
+The program expects the first argument to be the path to backup. In lieu
+of this argument the `RCLONE_TO_B2_FROM` environment variable can be
+specified. Failure to specify at least one of this is an error.
 
 ## Metrics
 
